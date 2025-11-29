@@ -1,0 +1,61 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build app with py2app
+        run: |
+          cd setup
+          python setup.py py2app
+
+      - name: Create ZIP archive
+        run: |
+          cd setup/dist
+          zip -r Syndi-${{ github.ref_name }}-macos.zip Syndi.app
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: Syndi-${{ github.ref_name }}-macos
+          path: setup/dist/Syndi-${{ github.ref_name }}-macos.zip
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: Syndi-${{ github.ref_name }}-macos
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Syndi ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: Syndi-${{ github.ref_name }}-macos.zip

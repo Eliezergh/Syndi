@@ -105,11 +105,22 @@ class SyndiApp(rumps.App):
         # *** Recent Items Menu
         if self.recent_items:
             recent_menu = rumps.MenuItem("Recent Items")
-            for item in reversed(self.recent_items):
+            # Items are stored newest-first
+            for item in self.recent_items:
                 title = item['title']
                 link = item['link']
-                feed_title = item['feed_title']
-                display_title = f"{title} ({feed_title})"
+                timestamp = item.get('timestamp', '')
+                
+                # Trim title to 64 characters max
+                if len(title) > 64:
+                    title = title[:61] + "..."
+                
+                # Format: [Mon 29 14:32] Title or [14:32] Title for today
+                if timestamp:
+                    display_title = f"[{timestamp}] {title}"
+                else:
+                    display_title = title
+                
                 recent_menu.add(rumps.MenuItem(display_title, callback=lambda sender, url=link: subprocess.run(['open', url])))
             self.menu.add(recent_menu)
         else:
@@ -280,10 +291,28 @@ class SyndiApp(rumps.App):
                         self.seen_items.add(item_id)
                         new_items_counter += 1
 
-                        # Store recent item
+                        # Store recent item with timestamp from article's published date
                         link = entry.get('link', 'No link available')
                         entry_title = entry.get('title', 'No title')
-                        self.recent_items.append({'title': entry_title, 'link': link, 'feed_title': parsed_feed.feed.get('title', 'No feed title')})
+                        
+                        # Try to get published date from feed entry
+                        published = entry.get('published_parsed') or entry.get('updated_parsed')
+                        if published:
+                            try:
+                                from time import mktime
+                                pub_datetime = datetime.fromtimestamp(mktime(published))
+                                timestamp = pub_datetime.strftime("%d-%m-%y %H:%M")
+                            except:
+                                timestamp = datetime.now().strftime("%d-%m-%y %H:%M")
+                        else:
+                            timestamp = datetime.now().strftime("%d-%m-%y %H:%M")
+                        
+                        self.recent_items.append({
+                            'title': entry_title,
+                            'link': link,
+                            'feed_title': parsed_feed.feed.get('title', 'No feed title'),
+                            'timestamp': timestamp
+                        })
 
                         # Trim recent items list
                         if len(self.recent_items) > self.max_recent_items:

@@ -1,0 +1,18 @@
+{
+  "feeds": [
+    {
+      "name": "Hacker News",
+      "url": "https://news.ycombinator.com/rss",
+      "enabled": true
+    },
+    {
+      "name": "GitHub Blog",
+      "url": "https://github.blog/feed/",
+      "enabled": true
+    }
+  ],
+  "check_interval_seconds": 300,
+  "notification_enabled": true,
+  "show_preview": true,
+  "max_recent_items": 10
+}

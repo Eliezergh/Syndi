@@ -4,7 +4,7 @@ Your simple syndication (RSS) notifier for macOS
 A lightweight menu bar app that notifies you when your favorite RSS feeds have new content and keeps them available until you dismiss them.
 
 ![macOS](https://img.shields.io/badge/macOS-11.0%2B-blue)
-![Python](https://img.shields.io/badge/Python-3.11%2B-green)
+![Python](https://img.shields.io/badge/Python-3.12%2B-green)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 ## Features

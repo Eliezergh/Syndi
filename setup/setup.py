@@ -28,7 +28,7 @@ OPTIONS = {
         'LSUIElement': True,  # This makes it a menu bar app (no dock icon)
         'NSHumanReadableCopyright': '2025 EliezerGH'
     },
-    'packages': ['rumps', 'feedparser', 'requests', 'certifi', 'pkg_resources'],
+    'packages': ['rumps', 'feedparser', 'requests', 'certifi'],
     'excludes': ['tkinter', 'matplotlib', 'numpy', 'scipy', 'pandas', 'test'],
     'strip': True,
     'optimize': 2,

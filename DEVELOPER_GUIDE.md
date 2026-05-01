@@ -5,7 +5,7 @@ This guide covers the local development workflow for Syndi, including environmen
 ## Prerequisites
 
 - macOS 11 or newer
-- Python 3.11+
+- Python 3.12+
 - A virtual environment tool such as `venv`
 
 ## Local Setup
@@ -117,5 +117,5 @@ Use this as a quick pre-PR checklist:
 ## Notes for Repository Maintainers
 
 - Public GitHub repositories can use macOS runners and CodeQL without GitHub Actions billing for minutes.
-- The release workflow is pinned to `macos-13` for reproducibility.
+- The release workflow is pinned to `macos-15` for reproducibility.
 - The release publishing step runs on Ubuntu because it only uploads the built artifact.

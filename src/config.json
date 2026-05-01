@@ -12,7 +12,11 @@
     }
   ],
   "check_interval_seconds": 300,
+  "request_timeout_seconds": 10,
   "notification_enabled": true,
   "show_preview": true,
-  "max_recent_items": 10
+  "startup_silent_sync": true,
+  "max_recent_items": 50,
+  "max_stored_notifications": 500,
+  "max_menu_notifications": 12
 }

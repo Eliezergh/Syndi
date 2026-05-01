@@ -3,59 +3,131 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*.*.*'
 
 jobs:
-  build:
-    runs-on: macos-latest
-    
+  test:
+    runs-on: macos-13
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt', 'requirements-dev.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run Ruff
+        run: ruff check src tests
+
+      - name: Check Ruff formatting
+        run: ruff format --check src tests
+
+      - name: Run tests (release gate)
+        run: pytest tests/ -v --tb=short
+
+  build:
+    needs: test
+    runs-on: macos-13
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-release-${{ hashFiles('requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Stamp version into source
+        run: |
+          python3 -c "
+          import re, pathlib
+          ver = '${{ steps.version.outputs.version }}'
+          for f in ['src/syndi.py', 'src/core.py']:
+              p = pathlib.Path(f)
+              p.write_text(re.sub(r'APP_VERSION = \".*?\"', f'APP_VERSION = \"{ver}\"', p.read_text()))
+          "
+
       - name: Build app with py2app
         run: |
           cd setup
           python setup.py py2app
 
+      - name: Ad-hoc code sign
+        run: codesign --force --deep --sign - setup/dist/Syndi.app
+
       - name: Create ZIP archive
         run: |
           cd setup/dist
-          zip -r Syndi-${{ github.ref_name }}-macos.zip Syndi.app
+          zip -r "Syndi-${{ github.ref_name }}-macos.zip" Syndi.app
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: Syndi-${{ github.ref_name }}-macos
           path: setup/dist/Syndi-${{ github.ref_name }}-macos.zip
+          retention-days: 30
 
   release:
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    
+
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Download artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v4
         with:
           name: Syndi-${{ github.ref_name }}-macos
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: Syndi ${{ github.ref_name }}
+          name: "Syndi ${{ github.ref_name }}"
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') || contains(github.ref_name, '-rc') }}
           generate_release_notes: true
           files: Syndi-${{ github.ref_name }}-macos.zip
+          body: |
+            ## Syndi ${{ github.ref_name }}
+
+            ### Installation
+            1. Download `Syndi-${{ github.ref_name }}-macos.zip`
+            2. Unzip and drag **Syndi.app** to your Applications folder
+            3. Right-click → **Open** on first launch to bypass Gatekeeper (ad-hoc signed)
+            4. On first run, Syndi copies the default `config.json` to `~/.syndi/config.json`
+            5. Edit that file to add your RSS feeds, then use **Options → Reload config**

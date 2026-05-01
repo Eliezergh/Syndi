@@ -125,7 +125,7 @@ def load_data(data_path: Path, max_stored: int) -> "tuple[set, list, dict, datet
 
     try:
         raw = json.loads(data_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError):
         return set(), [], {}, None
     seen_items = set(raw.get("seen_items", []))
     feed_state = raw.get("feed_state", {})

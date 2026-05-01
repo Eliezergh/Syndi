@@ -4,6 +4,7 @@ Syndi - Your simple syndication (RSS) notifier
 A lightweight macOS menu bar app for RSS and status feed notifications
 """
 
+import json
 import logging
 import shutil
 import subprocess
@@ -121,7 +122,15 @@ class SyndiApp(rumps.App):
         self.request_timeout = DEFAULT_REQUEST_TIMEOUT
         self.startup_silent_sync = True
 
-        self._apply_config(core.load_config(self.config_path)[0])
+        cfg, config_err = core.load_config(self.config_path)
+        self._apply_config(cfg)
+        if config_err:
+            self.logger.warning("Config load failed (%s); running on defaults", config_err)
+            rumps.notification(
+                title="Syndi",
+                subtitle="Config load failed",
+                message=f"Running on defaults. Check config.json. ({type(config_err).__name__})",
+            )
         self._load_data()
         self.poller = FeedPoller(self.session, self.request_timeout)
         self.build_menu()
@@ -384,7 +393,13 @@ class SyndiApp(rumps.App):
         self.menu_notification_limit = cfg.menu_notification_limit
         self.request_timeout = cfg.request_timeout
         self.startup_silent_sync = cfg.startup_silent_sync
-        self.raw_config = cfg.to_dict()
+        # Use the raw dict from disk so unknown keys (e.g. future fields) are
+        # preserved when the user saves from Preferences.  Fall back to the
+        # normalised dict if the file isn't readable at this point.
+        try:
+            self.raw_config = json.loads(self.config_path.read_text(encoding="utf-8"))
+        except Exception:
+            self.raw_config = cfg.to_dict()
 
     def _load_data(self):
         try:

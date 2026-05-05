@@ -74,19 +74,15 @@ jobs:
           git add src/core.py src/syndi.py
           git commit -m "chore: bump version to v${{ steps.bump.outputs.version }}"
 
-      - name: Create and push tags
+      - name: Create and push tag
         run: |
           NEW_VERSION="${{ steps.bump.outputs.version }}"
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$NEW_VERSION"
           
-          # Create full version tag
+          # Create full semantic version tag
           git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
           
-          # Create/update major version tag (e.g., v1)
-          git tag -fa "v$MAJOR" -m "Latest v$MAJOR release"
-          
           git push origin main --follow-tags
-          echo "Created tags: v$NEW_VERSION and v$MAJOR"
+          echo "Created tag: v$NEW_VERSION"
 
   test:
     # Runs on both tag push and workflow_dispatch (via tag push from version-bump)

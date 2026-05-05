@@ -164,7 +164,7 @@ class SyndiApp(rumps.App):
         options_menu.add(rumps.separator)
         options_menu.add(
             rumps.MenuItem(
-                "Dismiss all notifications",
+                "Archive all notifications",
                 callback=self.dismiss_all_notifications,
             )
         )
@@ -195,7 +195,7 @@ class SyndiApp(rumps.App):
             )
             row.add(
                 rumps.MenuItem(
-                    "Dismiss",
+                    "Archive",
                     callback=lambda s, iid=item["id"]: self._action_dismiss(iid),
                 )
             )
@@ -206,7 +206,7 @@ class SyndiApp(rumps.App):
             menu.add(rumps.MenuItem(f"+ {overflow} more"))
 
         menu.add(rumps.separator)
-        menu.add(rumps.MenuItem("Dismiss all", callback=self.dismiss_all_notifications))
+        menu.add(rumps.MenuItem("Archive all", callback=self.dismiss_all_notifications))
         return menu
 
     def _build_history_menu(self):

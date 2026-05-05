@@ -62,31 +62,9 @@ jobs:
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "Bumping from $CURRENT to $NEW_VERSION"
 
-      - name: Update version in source files
-        run: |
-          sed -i 's/APP_VERSION = "[^"]*"/APP_VERSION = "${{ steps.bump.outputs.version }}"/' src/core.py
-          sed -i 's/APP_VERSION = "[^"]*"/APP_VERSION = "${{ steps.bump.outputs.version }}"/' src/syndi.py
-
-      - name: Commit version bump
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add src/core.py src/syndi.py
-          git commit -m "chore: bump version to v${{ steps.bump.outputs.version }}"
-
-      - name: Create and push tag
-        run: |
-          NEW_VERSION="${{ steps.bump.outputs.version }}"
-          
-          # Create full semantic version tag
-          git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
-          
-          git push origin main --follow-tags
-          echo "Created tag: v$NEW_VERSION"
-
   test:
-    # Runs on both tag push and workflow_dispatch (via tag push from version-bump)
-    if: startsWith(github.ref, 'refs/tags/')
+    needs: [version-bump]
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v6
@@ -119,17 +97,30 @@ jobs:
         run: pytest tests/ -v --tb=short
 
   build:
-    needs: test
+    needs: [version-bump, test]
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     runs-on: macos-15
     outputs:
       version: ${{ steps.version.outputs.version }}
+      artifact_name: ${{ steps.meta.outputs.artifact_name }}
 
     steps:
       - uses: actions/checkout@v6
 
-      - name: Extract version from tag
+      - name: Resolve build metadata
+        id: meta
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ needs.version-bump.outputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "artifact_name=Syndi-v$VERSION-macos" >> $GITHUB_OUTPUT
+
+      - name: Extract version
         id: version
-        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+        run: echo "version=${{ steps.meta.outputs.version }}" >> $GITHUB_OUTPUT
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -169,17 +160,18 @@ jobs:
       - name: Create ZIP archive
         run: |
           cd setup/dist
-          zip -r "Syndi-${{ github.ref_name }}-macos.zip" Syndi.app
+          zip -r "${{ steps.meta.outputs.artifact_name }}.zip" Syndi.app
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
-          name: Syndi-${{ github.ref_name }}-macos
-          path: setup/dist/Syndi-${{ github.ref_name }}-macos.zip
+          name: ${{ steps.meta.outputs.artifact_name }}
+          path: setup/dist/${{ steps.meta.outputs.artifact_name }}.zip
           retention-days: 30
 
   release:
     needs: build
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -192,21 +184,35 @@ jobs:
       - name: Download artifact
         uses: actions/download-artifact@v8
         with:
-          name: Syndi-${{ github.ref_name }}-macos
+          name: ${{ needs.build.outputs.artifact_name }}
+
+      - name: Finalize version bump and tag
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          VERSION="${{ needs.build.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          sed -i 's/APP_VERSION = "[^"]*"/APP_VERSION = "'$VERSION'"/' src/core.py
+          sed -i 's/APP_VERSION = "[^"]*"/APP_VERSION = "'$VERSION'"/' src/syndi.py
+          git add src/core.py src/syndi.py
+          git commit -m "chore: bump version to v$VERSION"
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin HEAD:main --follow-tags
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          name: "Syndi ${{ github.ref_name }}"
+          tag_name: v${{ needs.build.outputs.version }}
+          name: "${{ needs.build.outputs.artifact_name }}"
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') || contains(github.ref_name, '-rc') }}
+          prerelease: ${{ contains(needs.build.outputs.version, '-beta') || contains(needs.build.outputs.version, '-alpha') || contains(needs.build.outputs.version, '-rc') }}
           generate_release_notes: true
-          files: Syndi-${{ github.ref_name }}-macos.zip
+          files: ${{ needs.build.outputs.artifact_name }}.zip
           body: |
-            ## Syndi ${{ github.ref_name }}
+            ## ${{ needs.build.outputs.artifact_name }}
 
             ### Installation
-            1. Download `Syndi-${{ github.ref_name }}-macos.zip`
+            1. Download `Syndi-v${{ needs.build.outputs.version }}-macos.zip`
             2. Unzip and drag **Syndi.app** to your Applications folder
             3. Right-click → **Open** on first launch to bypass Gatekeeper (ad-hoc signed)
             4. On first run, Syndi copies the default `config.json` to `~/.syndi/config.json`

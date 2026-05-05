@@ -16,7 +16,7 @@ import feedparser
 import requests
 
 APP_NAME = "Syndi"
-APP_VERSION = "1.2"
+APP_VERSION = "1.3.0"
 DATA_SCHEMA_VERSION = 2
 
 DEFAULT_CHECK_INTERVAL = 300

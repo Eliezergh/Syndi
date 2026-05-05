@@ -1,21 +1,21 @@
 """Tests for notification inbox management functions."""
 
 from core import (
+    active_count,
     active_notifications,
     dismiss_all_notifications,
     dismiss_notification,
     find_notification,
     mark_notification_opened,
-    unread_count,
 )
 
 
-def make_notification(id, *, discarded=False, read=False, opened=False):
+def make_notification(id, *, archived=False, read=False, opened=False):
     return {
         "id": id,
         "title": f"Item {id}",
         "link": f"https://example.com/{id}",
-        "archived_at": "2025-01-01T00:00:00" if discarded else None,
+        "archived_at": "2025-01-01T00:00:00" if archived else None,
         "read_at": "2025-01-01T00:00:00" if read else None,
         "opened_at": "2025-01-01T00:00:00" if opened else None,
     }
@@ -38,7 +38,7 @@ class TestActiveNotifications:
     def test_excludes_archived(self):
         notifs = [
             make_notification("a"),
-            make_notification("b", discarded=True),
+            make_notification("b", archived=True),
             make_notification("c"),
         ]
         active = active_notifications(notifs)
@@ -49,25 +49,25 @@ class TestActiveNotifications:
         assert active_notifications([]) == []
 
     def test_all_archived_returns_empty(self):
-        notifs = [make_notification("a", discarded=True)]
+        notifs = [make_notification("a", archived=True)]
         assert active_notifications(notifs) == []
 
 
-class TestUnreadCount:
+class TestActiveCount:
     def test_counts_active_notifications(self):
         notifs = [
             make_notification("a"),  # active
             make_notification("b"),  # active
-            make_notification("c", discarded=True),  # archived
+            make_notification("c", archived=True),  # archived
         ]
-        assert unread_count(notifs) == 2
+        assert active_count(notifs) == 2
 
     def test_zero_when_all_archived(self):
-        notifs = [make_notification("a", discarded=True)]
-        assert unread_count(notifs) == 0
+        notifs = [make_notification("a", archived=True)]
+        assert active_count(notifs) == 0
 
     def test_zero_for_empty_list(self):
-        assert unread_count([]) == 0
+        assert active_count([]) == 0
 
 
 class TestDismissNotification:
@@ -78,7 +78,7 @@ class TestDismissNotification:
         assert notifs[0]["archived_at"] is not None
 
     def test_returns_false_if_already_archived(self):
-        notifs = [make_notification("a", discarded=True)]
+        notifs = [make_notification("a", archived=True)]
         assert dismiss_notification(notifs, "a") is False
 
     def test_returns_false_if_not_found(self):
@@ -99,12 +99,12 @@ class TestDismissAllNotifications:
         assert all(n["archived_at"] for n in notifs)
 
     def test_skips_already_archived(self):
-        notifs = [make_notification("a", discarded=True)]
+        notifs = [make_notification("a", archived=True)]
         result = dismiss_all_notifications(notifs)
         assert result is False  # nothing changed
 
     def test_mixed_state(self):
-        notifs = [make_notification("a"), make_notification("b", discarded=True)]
+        notifs = [make_notification("a"), make_notification("b", archived=True)]
         result = dismiss_all_notifications(notifs)
         assert result is True
         assert notifs[0]["archived_at"] is not None

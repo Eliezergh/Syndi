@@ -136,6 +136,12 @@ def load_data(data_path: Path, max_stored: int) -> "tuple[set, list, dict, datet
     else:
         notifications = _migrate_legacy_recent_items(raw.get("recent_items", []))
 
+    # Migrate discarded_at -> archived_at (backward compat for pre-archive versions)
+    for notif in notifications:
+        if notif.get("discarded_at") and not notif.get("archived_at"):
+            notif["archived_at"] = notif["discarded_at"]
+            del notif["discarded_at"]
+
     notifications = trim_notifications(notifications, max_stored)
     return seen_items, notifications, feed_state, last_check
 
@@ -211,7 +217,7 @@ def active_notifications(notifications: list) -> list:
     return [item for item in notifications if not item.get("archived_at")]
 
 
-def unread_count(notifications: list) -> int:
+def active_count(notifications: list) -> int:
     """Count active (not archived) notifications."""
     return sum(1 for item in notifications if not item.get("archived_at"))
 

@@ -154,7 +154,7 @@ class TestNotificationFields:
             "created_at",
             "opened_at",
             "read_at",
-            "discarded_at",
+            "archived_at",
         }
         for notif in notifs:
             assert required.issubset(notif.keys()), f"Missing keys in {notif}"
@@ -165,7 +165,7 @@ class TestNotificationFields:
         for notif in notifs:
             assert notif["opened_at"] is None
             assert notif["read_at"] is None
-            assert notif["discarded_at"] is None
+            assert notif["archived_at"] is None
 
     def test_summary_is_html_stripped(self):
         poller, _ = _make_poller()

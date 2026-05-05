@@ -27,7 +27,7 @@ class TestLoadData:
                 "created_at": "2025-01-01T00:00:00",
                 "opened_at": None,
                 "read_at": None,
-                "discarded_at": None,
+                "archived_at": None,
             }
         ]
         feed_state = {"https://example.com/rss": {"initialized": True}}
@@ -66,7 +66,7 @@ class TestLoadData:
         assert len(notifs) == 1
         assert notifs[0]["title"] == "Old Article"
         assert notifs[0]["read_at"] is None
-        assert notifs[0]["discarded_at"] is None
+        assert notifs[0]["archived_at"] is None
 
     def test_last_check_roundtrip(self, data_path):
         ts = datetime(2025, 6, 15, 12, 30, 0)
@@ -75,7 +75,7 @@ class TestLoadData:
         assert loaded_lc == ts
 
     def test_trims_on_load(self, data_path):
-        notifs = [{"id": str(i), "discarded_at": "2025-01-01T00:00:00"} for i in range(20)]
+        notifs = [{"id": str(i), "archived_at": "2025-01-01T00:00:00"} for i in range(20)]
         save_data(data_path, set(), notifs, {}, None, 20)
         _, loaded, _, _ = load_data(data_path, 5)
         assert len(loaded) == 5
@@ -83,16 +83,16 @@ class TestLoadData:
 
 class TestTrimNotifications:
     def test_no_trim_when_under_limit(self):
-        notifs = [{"id": str(i), "discarded_at": None} for i in range(5)]
+        notifs = [{"id": str(i), "archived_at": None} for i in range(5)]
         result = trim_notifications(notifs, 10)
         assert len(result) == 5
 
-    def test_drops_old_dismissed_first(self):
+    def test_drops_old_archived_first(self):
         notifs = [
-            {"id": "active-1", "discarded_at": None},
-            {"id": "dismissed-1", "discarded_at": "2025-01-01T00:00:00"},
-            {"id": "active-2", "discarded_at": None},
-            {"id": "dismissed-2", "discarded_at": "2025-01-01T00:00:00"},
+            {"id": "active-1", "archived_at": None},
+            {"id": "archived-1", "archived_at": "2025-01-01T00:00:00"},
+            {"id": "active-2", "archived_at": None},
+            {"id": "archived-2", "archived_at": "2025-01-01T00:00:00"},
         ]
         result = trim_notifications(notifs, max_stored=2)
         result_ids = {n["id"] for n in result}
@@ -101,14 +101,14 @@ class TestTrimNotifications:
         assert "active-2" in result_ids
 
     def test_exact_limit_not_trimmed(self):
-        notifs = [{"id": str(i), "discarded_at": None} for i in range(10)]
+        notifs = [{"id": str(i), "archived_at": None} for i in range(10)]
         assert len(trim_notifications(notifs, 10)) == 10
 
     def test_returns_new_list_when_trimming(self):
         notifs = [
             {
                 "id": str(i),
-                "discarded_at": "2025-01-01T00:00:00",
+                "archived_at": "2025-01-01T00:00:00",
             }
             for i in range(10)
         ]
@@ -117,16 +117,16 @@ class TestTrimNotifications:
         assert len(result) == 5
 
     def test_hard_cap_enforced_even_with_all_active(self):
-        # All items are active (no discarded_at); cap must still be honoured
-        notifs = [{"id": str(i), "discarded_at": None} for i in range(20)]
+        # All items are active (no archived_at); cap must still be honoured
+        notifs = [{"id": str(i), "archived_at": None} for i in range(20)]
         result = trim_notifications(notifs, max_stored=10)
         assert len(result) == 10
 
-    def test_active_items_kept_over_dismissed(self):
-        # When cap forces a choice, active items survive and dismissed are dropped
-        active = [{"id": f"a{i}", "discarded_at": None} for i in range(8)]
-        dismissed = [{"id": f"d{i}", "discarded_at": "2025-01-01T00:00:00"} for i in range(8)]
-        result = trim_notifications(active + dismissed, max_stored=8)
+    def test_active_items_kept_over_archived(self):
+        # When cap forces a choice, active items survive and archived are dropped
+        active = [{"id": f"a{i}", "archived_at": None} for i in range(8)]
+        archived = [{"id": f"d{i}", "archived_at": "2025-01-01T00:00:00"} for i in range(8)]
+        result = trim_notifications(active + archived, max_stored=8)
         result_ids = {n["id"] for n in result}
         assert all(n["id"] in result_ids for n in active)
-        assert not any(n["id"] in result_ids for n in dismissed)
+        assert not any(n["id"] in result_ids for n in archived)

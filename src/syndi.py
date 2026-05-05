@@ -164,7 +164,7 @@ class SyndiApp(rumps.App):
         options_menu.add(rumps.separator)
         options_menu.add(
             rumps.MenuItem(
-                "Dismiss all notifications",
+                "Archive all notifications",
                 callback=self.dismiss_all_notifications,
             )
         )
@@ -177,8 +177,7 @@ class SyndiApp(rumps.App):
 
     def _build_notifications_menu(self):
         active = core.active_notifications(self.notifications)
-        unread = core.unread_count(self.notifications)
-        label = f"Notifications ({unread} unread)" if unread else f"Notifications ({len(active)})"
+        label = f"Notifications ({len(active)})"
         menu = rumps.MenuItem(label)
 
         if not active:
@@ -187,8 +186,7 @@ class SyndiApp(rumps.App):
 
         for item in active[: self.menu_notification_limit]:
             title = core.display_title(item)
-            row_label = title if item.get("read_at") else f"● {title}"
-            row = rumps.MenuItem(row_label)
+            row = rumps.MenuItem(title)
             row.add(
                 rumps.MenuItem(
                     "Open link",
@@ -197,13 +195,7 @@ class SyndiApp(rumps.App):
             )
             row.add(
                 rumps.MenuItem(
-                    "Mark as read",
-                    callback=lambda s, iid=item["id"]: self._action_mark_read(iid),
-                )
-            )
-            row.add(
-                rumps.MenuItem(
-                    "Dismiss",
+                    "Archive",
                     callback=lambda s, iid=item["id"]: self._action_dismiss(iid),
                 )
             )
@@ -214,7 +206,7 @@ class SyndiApp(rumps.App):
             menu.add(rumps.MenuItem(f"+ {overflow} more"))
 
         menu.add(rumps.separator)
-        menu.add(rumps.MenuItem("Dismiss all", callback=self.dismiss_all_notifications))
+        menu.add(rumps.MenuItem("Archive all", callback=self.dismiss_all_notifications))
         return menu
 
     def _build_history_menu(self):
@@ -225,10 +217,8 @@ class SyndiApp(rumps.App):
 
         for item in self.notifications[: self.max_recent_items]:
             label = core.display_title(item)
-            if item.get("discarded_at"):
-                label = f"[dismissed] {label}"
-            elif item.get("read_at"):
-                label = f"[read] {label}"
+            if item.get("archived_at"):
+                label = f"[archived] {label}"
             menu.add(
                 rumps.MenuItem(
                     label,
@@ -289,11 +279,6 @@ class SyndiApp(rumps.App):
                 self._persist_and_rebuild()
         if item:
             self.open_url(item.get("link"))
-
-    def _action_mark_read(self, item_id: str):
-        with self.check_lock:
-            if core.mark_notification_read(self.notifications, item_id):
-                self._persist_and_rebuild()
 
     def _action_dismiss(self, item_id: str):
         with self.check_lock:

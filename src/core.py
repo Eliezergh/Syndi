@@ -154,7 +154,7 @@ def _migrate_legacy_recent_items(legacy: list) -> list:
                 "created_at": item.get("timestamp", ""),
                 "opened_at": None,
                 "read_at": None,
-                "discarded_at": None,
+                "archived_at": None,
             }
         )
     return result
@@ -194,12 +194,12 @@ def save_data(
 
 
 def trim_notifications(notifications: list, max_stored: int) -> list:
-    """Keep at most max_stored items, dropping dismissed ones before active ones."""
+    """Keep at most max_stored items, dropping archived ones before active ones."""
     if len(notifications) <= max_stored:
         return notifications
-    active = [n for n in notifications if not n.get("discarded_at")]
-    dismissed = [n for n in notifications if n.get("discarded_at")]
-    return (active + dismissed)[:max_stored]
+    active = [n for n in notifications if not n.get("archived_at")]
+    archived = [n for n in notifications if n.get("archived_at")]
+    return (active + archived)[:max_stored]
 
 
 def find_notification(notifications: list, item_id: str) -> "dict | None":
@@ -207,54 +207,46 @@ def find_notification(notifications: list, item_id: str) -> "dict | None":
 
 
 def active_notifications(notifications: list) -> list:
-    """Items that have not been dismissed."""
-    return [item for item in notifications if not item.get("discarded_at")]
+    """Items that have not been archived."""
+    return [item for item in notifications if not item.get("archived_at")]
 
 
 def unread_count(notifications: list) -> int:
-    """Count active and unread notifications."""
-    return sum(
-        1 for item in notifications if not item.get("discarded_at") and not item.get("read_at")
-    )
+    """Count active (not archived) notifications."""
+    return sum(1 for item in notifications if not item.get("archived_at"))
 
 
 def dismiss_notification(notifications: list, item_id: str) -> bool:
-    """Mark one notification as dismissed. Returns False if not found or already dismissed."""
+    """Mark one notification as archived. Returns False if not found or already archived."""
     item = find_notification(notifications, item_id)
-    if item is None or item.get("discarded_at"):
+    if item is None or item.get("archived_at"):
         return False
-    item["discarded_at"] = now_iso()
+    item["archived_at"] = now_iso()
     return True
 
 
 def dismiss_all_notifications(notifications: list) -> bool:
-    """Dismiss all active notifications. Returns True if anything changed."""
+    """Archive all active notifications. Returns True if anything changed."""
     ts = now_iso()
     changed = False
     for item in notifications:
-        if not item.get("discarded_at"):
-            item["discarded_at"] = ts
+        if not item.get("archived_at"):
+            item["archived_at"] = ts
             changed = True
     return changed
 
 
-def mark_notification_read(notifications: list, item_id: str) -> bool:
-    """Mark as read without opening the URL or dismissing. Returns False if already read."""
-    item = find_notification(notifications, item_id)
-    if item is None or item.get("read_at"):
-        return False
-    item["read_at"] = now_iso()
-    return True
-
-
 def mark_notification_opened(notifications: list, item_id: str) -> bool:
-    """Mark as opened (implies read). Returns True if the item was found."""
+    """Mark as opened and archive (moves to History). Returns True if the item was found."""
     item = find_notification(notifications, item_id)
     if item is None:
         return False
-    item["opened_at"] = now_iso()
+    ts = now_iso()
+    item["opened_at"] = ts
     if not item.get("read_at"):
-        item["read_at"] = now_iso()
+        item["read_at"] = ts
+    if not item.get("archived_at"):
+        item["archived_at"] = ts
     return True
 
 
@@ -336,7 +328,7 @@ class FeedPoller:
                         "created_at": now_iso(),
                         "opened_at": None,
                         "read_at": None,
-                        "discarded_at": None,
+                        "archived_at": None,
                     }
                 )
 

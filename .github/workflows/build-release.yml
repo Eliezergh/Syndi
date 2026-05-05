@@ -4,9 +4,93 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 jobs:
+  version-bump:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Get latest version tag
+        id: latest
+        run: |
+          # Fetch all tags and find the latest semver tag
+          LATEST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -1)
+          if [ -z "$LATEST_TAG" ]; then
+            LATEST_TAG="v0.0.0"
+          fi
+          VERSION="${LATEST_TAG#v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Latest tag: $LATEST_TAG (version: $VERSION)"
+
+      - name: Bump version
+        id: bump
+        run: |
+          CURRENT="${{ steps.latest.outputs.version }}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          
+          case "${{ github.event.inputs.bump }}" in
+            major)
+              NEW_MAJOR=$((MAJOR+1))
+              NEW_VERSION="$NEW_MAJOR.0.0"
+              ;;
+            minor)
+              NEW_MINOR=$((MINOR+1))
+              NEW_VERSION="$MAJOR.$NEW_MINOR.0"
+              ;;
+            patch)
+              NEW_PATCH=$((PATCH+1))
+              NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+              ;;
+          esac
+          
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Bumping from $CURRENT to $NEW_VERSION"
+
+      - name: Update version in source files
+        run: |
+          sed -i 's/APP_VERSION = "[^"]*"/APP_VERSION = "${{ steps.bump.outputs.version }}"/' src/core.py
+          sed -i 's/APP_VERSION = "[^"]*"/APP_VERSION = "${{ steps.bump.outputs.version }}"/' src/syndi.py
+
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/core.py src/syndi.py
+          git commit -m "chore: bump version to v${{ steps.bump.outputs.version }}"
+
+      - name: Create and push tags
+        run: |
+          NEW_VERSION="${{ steps.bump.outputs.version }}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$NEW_VERSION"
+          
+          # Create full version tag
+          git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+          
+          # Create/update major version tag (e.g., v1)
+          git tag -fa "v$MAJOR" -m "Latest v$MAJOR release"
+          
+          git push origin main --follow-tags
+          echo "Created tags: v$NEW_VERSION and v$MAJOR"
+
   test:
+    # Runs on both tag push and workflow_dispatch (via tag push from version-bump)
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v6

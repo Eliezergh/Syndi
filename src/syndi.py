@@ -186,13 +186,13 @@ class SyndiApp(rumps.App):
 
         for item in active[: self.menu_notification_limit]:
             title = core.display_title(item)
-            row = rumps.MenuItem(title)
-            row.add(
-                rumps.MenuItem(
-                    "Open link",
-                    callback=lambda s, iid=item["id"]: self._action_open(iid),
+            url = item.get("link", "")
+            if url and urlparse(url).scheme in ("http", "https"):
+                row = rumps.MenuItem(
+                    title, callback=lambda s, iid=item["id"]: self._action_open(iid)
                 )
-            )
+            else:
+                row = rumps.MenuItem(title)
             row.add(
                 rumps.MenuItem(
                     "Archive",
@@ -239,17 +239,24 @@ class SyndiApp(rumps.App):
             name = feed.get("name", feed.get("url", "Unnamed feed"))
             if not feed.get("enabled", True):
                 label = f"{name}: Disabled"
+                menu.add(rumps.MenuItem(label))
             elif state.get("last_error"):
                 label = f"⚠ {name}: Error"
-            elif state.get("last_success_at"):
-                ts = core.parse_iso_datetime(state["last_success_at"])
-                time_str = ts.strftime("%H:%M") if ts else ""
-                label = f"{name}: OK {time_str}"
-            elif state.get("initialized"):
-                label = f"{name}: Ready"
+                menu.add(rumps.MenuItem(label))
             else:
-                label = f"{name}: Pending first sync"
-            menu.add(rumps.MenuItem(label))
+                if state.get("last_success_at"):
+                    ts = core.parse_iso_datetime(state["last_success_at"])
+                    time_str = ts.strftime("%H:%M") if ts else ""
+                    label = f"{name}: OK {time_str}"
+                elif state.get("initialized"):
+                    label = f"{name}: Ready"
+                else:
+                    label = f"{name}: Pending first sync"
+                url = state.get("feed_link") or feed.get("url", "")
+                if url and urlparse(url).scheme in ("http", "https"):
+                    menu.add(rumps.MenuItem(label, callback=lambda s, u=url: self.open_url(u)))
+                else:
+                    menu.add(rumps.MenuItem(label))
         return menu
 
     def open_preferences(self, sender):

@@ -140,6 +140,37 @@ class TestErrorHandling:
             poller.fetch(FEED, {}, set())
 
 
+class TestFeedLinkState:
+    def test_stores_feed_link_from_channel(self):
+        poller, _ = _make_poller()
+        _, _, state = poller.fetch(FEED, {}, set())
+        assert state.get("feed_link") == "https://example.com"
+
+    def test_falls_back_to_feed_url_when_no_channel_link(self):
+        rss_no_link = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>No Link Feed</title>
+    <description>Feed with no homepage link</description>
+    <item>
+      <title>Item</title>
+      <guid>https://example.com/item1</guid>
+    </item>
+  </channel>
+</rss>
+"""
+        poller, _ = _make_poller(content=rss_no_link)
+        _, _, state = poller.fetch(FEED, {}, set())
+        assert state.get("feed_link") == FEED["url"]
+
+    def test_feed_link_preserved_on_304(self):
+        poller, _ = _make_poller(status_code=304, content="")
+        existing_state = {"feed_link": "https://example.com"}
+        _, _, state = poller.fetch(FEED, existing_state, set())
+        assert state.get("feed_link") == "https://example.com"
+
+
 class TestNotificationFields:
     def test_required_fields_present(self):
         poller, _ = _make_poller()

@@ -144,9 +144,14 @@ jobs:
           python3 -c "
           import re, pathlib
           ver = '${{ steps.version.outputs.version }}'
-          for f in ['src/syndi.py', 'src/core.py']:
+          for f in ['src/core.py']:
               p = pathlib.Path(f)
               p.write_text(re.sub(r'APP_VERSION = \".*?\"', f'APP_VERSION = \"{ver}\"', p.read_text()))
+          p = pathlib.Path('setup/setup.py')
+          text = p.read_text()
+          text = re.sub(r\"'CFBundleVersion': '[^']*'\", f\"'CFBundleVersion': '{ver}'\", text)
+          text = re.sub(r\"'CFBundleShortVersionString': '[^']*'\", f\"'CFBundleShortVersionString': '{ver}'\", text)
+          p.write_text(text)
           "
 
       - name: Build app with py2app
@@ -193,8 +198,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           sed -i 's/APP_VERSION = "[^"]*"/APP_VERSION = "'$VERSION'"/' src/core.py
-          sed -i 's/APP_VERSION = "[^"]*"/APP_VERSION = "'$VERSION'"/' src/syndi.py
-          git add src/core.py src/syndi.py
+          sed -i "s/'CFBundleVersion': '[^']*'/'CFBundleVersion': '$VERSION'/" setup/setup.py
+          sed -i "s/'CFBundleShortVersionString': '[^']*'/'CFBundleShortVersionString': '$VERSION'/" setup/setup.py
+          git add src/core.py setup/setup.py
           git commit -m "chore: bump version to v$VERSION"
           git tag -a "v$VERSION" -m "Release v$VERSION"
           git push origin HEAD:main --follow-tags

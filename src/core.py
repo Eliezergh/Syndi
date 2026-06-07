@@ -311,6 +311,7 @@ class FeedPoller:
         state["etag"] = response.headers.get("ETag") or state.get("etag")
         state["last_modified"] = response.headers.get("Last-Modified") or state.get("last_modified")
         state["title"] = parsed.feed.get("title", feed.get("name", feed["url"]))
+        state["feed_link"] = parsed.feed.get("link") or feed["url"]
         state["last_success_at"] = now_iso()
         state["last_error"] = None
 

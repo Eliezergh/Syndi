@@ -56,6 +56,9 @@ def resolve_resources_path():
     return Path(__file__).parent
 
 
+_app: "SyndiApp | None" = None
+
+
 class SyndiApp(rumps.App):
     def __init__(self):
         resources_path = resolve_resources_path()
@@ -68,6 +71,9 @@ class SyndiApp(rumps.App):
             icon=str(icon_path) if icon_path.exists() else None,
             quit_button=None,
         )
+
+        global _app
+        _app = self
 
         self.resources_path = resources_path
 
@@ -292,6 +298,12 @@ class SyndiApp(rumps.App):
             if core.dismiss_notification(self.notifications, item_id):
                 self._persist_and_rebuild()
 
+    def _handle_notification_opened(self, item_id: str):
+        """Mark a notification as read/archived when opened from macOS Notification Center."""
+        with self.check_lock:
+            if core.mark_notification_opened(self.notifications, item_id):
+                self._persist_and_rebuild()
+
     def test_notification(self, sender):
         ts = datetime.now().strftime("%H:%M:%S")
         self.send_notification(
@@ -506,18 +518,34 @@ class SyndiApp(rumps.App):
         subprocess.run(["osascript", "-e", script], check=False, capture_output=True)
 
 
-@rumps.notifications
-def notification_center(notification):
-    payload = notification.data or {}
+def _handle_nc_action(payload: dict, app: "SyndiApp | None") -> None:
+    """
+    Dispatch a notification-center action payload.
+
+    Handles ``open_url`` (opens the link in the browser and marks the
+    corresponding notification as read/archived) and ``open_file``
+    (opens the file with the default application).
+
+    Extracted from ``notification_center`` so it can be unit-tested
+    without a live macOS Notification Centre.
+    """
     action = payload.get("action")
     if action == "open_url":
         url = payload.get("url", "")
+        item_id = payload.get("item_id")
+        if item_id and app is not None:
+            app._handle_notification_opened(item_id)
         if urlparse(url).scheme in ("http", "https"):
             subprocess.run(["open", url], check=False)
     elif action == "open_file":
         path = payload.get("path")
         if path:
             subprocess.run(["open", path], check=False)
+
+
+@rumps.notifications
+def notification_center(notification):
+    _handle_nc_action(notification.data or {}, _app)
 
 
 def main():

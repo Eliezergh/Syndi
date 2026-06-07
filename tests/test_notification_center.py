@@ -3,8 +3,6 @@
 import sys
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 # ---------------------------------------------------------------------------
 # Provide lightweight stubs for platform-only modules *before* importing syndi
 # so the test suite can run on non-macOS CI environments.
@@ -15,7 +13,7 @@ rumps_mock.notifications = lambda f: f  # make @rumps.notifications a pass-throu
 sys.modules.setdefault("rumps", rumps_mock)
 sys.modules.setdefault("AppKit", MagicMock())
 
-from syndi import _handle_nc_action  # noqa: E402
+from syndi import _handle_nc_action  # noqa: E402, I001
 
 
 # ---------------------------------------------------------------------------

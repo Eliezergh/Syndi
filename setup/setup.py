@@ -23,8 +23,8 @@ OPTIONS = {
         'CFBundleDisplayName': 'Syndi',
         'CFBundleGetInfoString': 'Your simple syndication (RSS) notifier',
         'CFBundleIdentifier': 'com.eliezergh.syndi',
-        'CFBundleVersion': '1.0.0',
-        'CFBundleShortVersionString': '1.0.0',
+        'CFBundleVersion': '1.3.2',
+        'CFBundleShortVersionString': '1.3.2',
         'LSUIElement': True,  # This makes it a menu bar app (no dock icon)
         'NSHumanReadableCopyright': '2025 EliezerGH'
     },
